@@ -1,0 +1,582 @@
+<!-- ver a 1.1 -->
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vine Sweeper: Garden Discovery</title>
+    <style>
+        /* Load Tailwind via CDN for utility classes on the container */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        /* Global Styling & Reset */
+        :root {
+            --color-garden-green: #38a169;
+            --color-dirt-brown: #a0522d;
+            --color-vine-red: #cc4141;
+            --color-safe-yellow: #f6e05e;
+            --color-text-dark: #2d3748;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc;
+            color: var(--color-text-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+        }
+
+        /* Container for the game */
+        .game-container {
+            max-width: 90vw;
+            width: 400px;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* Header and Status */
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-garden-green);
+        }
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 2px solid #edf2f7;
+            font-weight: 600;
+        }
+        .status-bar span {
+            font-size: 1.1rem;
+        }
+
+        /* Game Board Grid */
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            gap: 2px;
+            border: 4px solid var(--color-dirt-brown);
+            border-radius: 8px;
+            aspect-ratio: 1 / 1; /* Keep the board perfectly square */
+            width: 100%;
+        }
+
+        /* Individual Cell Styling */
+        .cell {
+            background-color: var(--color-garden-green);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--color-text-dark);
+            border: 1px solid #48bb78; /* Darker green border */
+            transition: background-color 0.1s ease;
+        }
+        .cell:hover {
+            background-color: #48bb78;
+        }
+        .cell.revealed {
+            background-color: #edf2f7; /* Light dirt/path color */
+            cursor: default;
+            border-color: #cbd5e0;
+        }
+        .cell.revealed:hover {
+            background-color: #edf2f7;
+        }
+
+        /* Vine Colors (Minesweeper numbers) */
+        .cell[data-vines="1"] { color: #2b6cb0; } /* Blue */
+        .cell[data-vines="2"] { color: var(--color-garden-green); } /* Green */
+        .cell[data-vines="3"] { color: var(--color-vine-red); } /* Red */
+        .cell[data-vines="4"] { color: #6b46c1; } /* Purple */
+        .cell[data-vines="5"] { color: #9c3c3c; } /* Dark Red */
+        .cell[data-vines="6"] { color: #319795; } /* Teal */
+        .cell[data-vines="7"] { color: #1a202c; } /* Black */
+        .cell[data-vines="8"] { color: #718096; } /* Gray */
+
+        /* Special States */
+        .cell.flag {
+            background-color: var(--color-safe-yellow);
+            font-size: 1.1rem;
+        }
+        .cell.vine {
+            background-color: var(--color-vine-red);
+            font-size: 1.5rem;
+            color: white;
+        }
+        .cell.safe-miss {
+            background-color: #a0aec0;
+        }
+
+        /* Buttons & Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            background-color: var(--color-garden-green);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .btn:hover {
+            background-color: #3f905c;
+            box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.15);
+        }
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Flag Mode Button Specific Styling */
+        .btn-flag-mode {
+            background-color: var(--color-garden-green);
+        }
+        .btn-flag-mode.active {
+            background-color: var(--color-safe-yellow);
+            color: var(--color-text-dark);
+            font-weight: 700;
+            border: 2px solid var(--color-dirt-brown);
+        }
+        .btn-flag-mode.active:hover {
+             background-color: #fbd38d;
+        }
+
+        /* Custom Modal for Game Over/Win */
+        #messageModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+            max-width: 80%;
+        }
+        .modal-content h2 {
+            margin-top: 0;
+            font-size: 2rem;
+        }
+        .modal-content p {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+
+        /* Media Queries for Desktop */
+        @media (min-width: 768px) {
+            .game-container {
+                padding: 30px;
+                width: 450px; /* Fixed width for 8x8 + padding */
+            }
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="header">
+            <h1>🌿 Vine Sweeper</h1>
+            <p>PC: Left-click to reveal, Right-click to flag. Mobile: Use the 'Flag Mode' toggle.</p>
+        </div>
+
+        <div class="status-bar">
+            <span>Vines Remaining: <span id="vinesCount">10</span></span>
+            <span>Time: <span id="timer">0</span>s</span>
+        </div>
+
+        <div id="gameBoard">
+            <!-- Grid cells will be generated here by JavaScript -->
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="newGameButton">New Game</button>
+            <button class="btn btn-flag-mode" id="toggleFlagModeButton">Toggle Flag Mode (OFF)</button>
+        </div>
+    </div>
+
+    <!-- Game Over/Win Modal -->
+    <div id="messageModal">
+        <div class="modal-content">
+            <h2 id="modalTitle"></h2>
+            <p id="modalMessage"></p>
+            <button class="btn" onclick="document.getElementById('messageModal').style.display='none'; startGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME CONFIGURATION ---
+        const ROWS = 8;
+        const COLS = 8;
+        const VINES_COUNT = 10;
+        
+        // --- DOM ELEMENTS ---
+        const board = document.getElementById('gameBoard');
+        const vinesCountDisplay = document.getElementById('vinesCount');
+        const timerDisplay = document.getElementById('timer');
+        const newGameButton = document.getElementById('newGameButton');
+        const toggleFlagModeButton = document.getElementById('toggleFlagModeButton');
+        const messageModal = document.getElementById('messageModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+
+        // --- GAME STATE ---
+        let gameData = [];
+        let isGameOver = false;
+        let isGameStarted = false;
+        let timerInterval;
+        let elapsedTime = 0;
+        let revealedCount = 0;
+        let flagsPlaced = 0;
+        let isFlagMode = false; 
+        const SAFE_CELLS_TO_WIN = (ROWS * COLS) - VINES_COUNT;
+
+        /**
+         * Converts coordinates (row, col) to a string ID.
+         */
+        function getId(r, c) {
+            return `${r}-${c}`;
+        }
+
+        /**
+         * Starts or resets the game state and UI.
+         */
+        function startGame() {
+            // Reset state
+            isGameOver = false;
+            isGameStarted = false;
+            revealedCount = 0;
+            flagsPlaced = 0;
+            elapsedTime = 0;
+            gameData = [];
+            clearInterval(timerInterval);
+            timerDisplay.textContent = 0;
+            
+            // Reset Flag Mode UI
+            isFlagMode = false;
+            updateFlagModeUI();
+
+            // Update displays
+            vinesCountDisplay.textContent = VINES_COUNT;
+            
+            // Clear board and generate new one
+            board.innerHTML = '';
+            generateBoard();
+            
+            // Setup listeners
+            setupListeners();
+            messageModal.style.display = 'none';
+        }
+
+        /**
+         * Initializes the game board structure (HTML elements).
+         */
+        function generateBoard() {
+            for (let r = 0; r < ROWS; r++) {
+                gameData[r] = [];
+                for (let c = 0; c < COLS; c++) {
+                    gameData[r][c] = {
+                        isVine: false,
+                        vinesAround: 0,
+                        isRevealed: false,
+                        isFlagged: false
+                    };
+                    
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.id = getId(r, c);
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    board.appendChild(cell);
+                }
+            }
+        }
+        
+        /**
+         * Places vines randomly and calculates adjacent vine counts.
+         */
+        function placeVines(startRow, startCol) {
+            let placed = 0;
+            const safeStartCell = getId(startRow, startCol);
+
+            while (placed < VINES_COUNT) {
+                const r = Math.floor(Math.random() * ROWS);
+                const c = Math.floor(Math.random() * COLS);
+                
+                if (!gameData[r][c].isVine && getId(r, c) !== safeStartCell) {
+                    gameData[r][c].isVine = true;
+                    placed++;
+                }
+            }
+            
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (!gameData[r][c].isVine) {
+                        gameData[r][c].vinesAround = countAdjacentVines(r, c);
+                    }
+                }
+            }
+        }
+
+        /**
+         * Counts the number of vines in neighboring cells.
+         */
+        function countAdjacentVines(r, c) {
+            let count = 0;
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+
+                    const nr = r + dr;
+                    const nc = c + dc;
+
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                        if (gameData[nr][nc].isVine) {
+                            count++;
+                        }
+                    }
+                }
+            }
+            return count;
+        }
+
+        /**
+         * Starts the game timer.
+         */
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                elapsedTime++;
+                timerDisplay.textContent = elapsedTime;
+            }, 1000);
+        }
+
+        /**
+         * Core game logic to reveal a cell.
+         */
+        function revealCell(r, c) {
+            if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+
+            const cellData = gameData[r][c];
+            if (cellData.isRevealed || cellData.isFlagged || isGameOver) return;
+            
+            const cellElement = document.getElementById(getId(r, c));
+
+            // 1. Reveal Cell
+            cellData.isRevealed = true;
+            revealedCount++;
+
+            cellElement.classList.add('revealed');
+            
+            // 2. Check for Vine Hit (Game Over)
+            if (cellData.isVine) {
+                cellElement.innerHTML = '🌱'; // Vine emoji
+                cellElement.classList.add('vine');
+                gameOver(false);
+                return;
+            }
+
+            // 3. Display surrounding vine count
+            if (cellData.vinesAround > 0) {
+                cellElement.textContent = cellData.vinesAround;
+                cellElement.dataset.vines = cellData.vinesAround;
+            } else {
+                // 4. Zero count: Recursively reveal neighbors
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        revealCell(r + dr, c + dc);
+                    }
+                }
+            }
+
+            // 5. Check for Win Condition
+            if (revealedCount === SAFE_CELLS_TO_WIN) {
+                gameOver(true);
+            }
+        }
+
+        /**
+         * Toggles the flag state on a cell.
+         */
+        function toggleFlag(r, c) {
+            if (isGameOver) return;
+            
+            const cellData = gameData[r][c];
+            const cellElement = document.getElementById(getId(r, c));
+
+            if (cellData.isRevealed) return;
+
+            if (cellData.isFlagged) {
+                cellData.isFlagged = false;
+                flagsPlaced--;
+                cellElement.classList.remove('flag');
+                cellElement.innerHTML = '';
+            } else if (flagsPlaced < VINES_COUNT) {
+                cellData.isFlagged = true;
+                flagsPlaced++;
+                cellElement.classList.add('flag');
+                cellElement.innerHTML = '🚩'; // Flag emoji
+            }
+            vinesCountDisplay.textContent = VINES_COUNT - flagsPlaced;
+        }
+
+        /**
+         * Toggles the Flag Mode state and updates the button UI.
+         */
+        function toggleFlagMode() {
+            isFlagMode = !isFlagMode;
+            updateFlagModeUI();
+        }
+
+        /**
+         * Updates the Flag Mode button's appearance and text.
+         */
+        function updateFlagModeUI() {
+            if (isFlagMode) {
+                toggleFlagModeButton.classList.add('active');
+                toggleFlagModeButton.textContent = 'Flag Mode (ON) 🚩';
+            } else {
+                toggleFlagModeButton.classList.remove('active');
+                toggleFlagModeButton.textContent = 'Toggle Flag Mode (OFF)';
+            }
+        }
+
+        /**
+         * Handles the click/tap event on a cell. (FIXED to use click event delegation)
+         */
+        function handleCellInteraction(e) {
+            // Find the closest parent that is a 'cell' element
+            let cell = e.target.closest('.cell');
+
+            if (!cell || isGameOver) return; // Ignore if not clicking on a cell or game is over
+
+            const r = parseInt(cell.dataset.row);
+            const c = parseInt(cell.dataset.col);
+
+            // Start game on the first interaction
+            if (!isGameStarted) {
+                placeVines(r, c);
+                startTimer();
+                isGameStarted = true;
+            }
+
+            // If Flag Mode is ON, toggle flag. Otherwise, reveal cell.
+            if (isFlagMode) {
+                toggleFlag(r, c);
+            } else {
+                revealCell(r, c);
+            }
+        }
+
+        /**
+         * Handles the contextmenu (right-click) event on a cell (PC only).
+         */
+        function handleContextMenu(e) {
+            e.preventDefault(); // Prevent browser context menu
+            const cell = e.target.closest('.cell');
+            
+            if (cell) {
+                const r = parseInt(cell.dataset.row);
+                const c = parseInt(cell.dataset.col);
+                toggleFlag(r, c);
+            }
+        }
+        
+        /**
+         * Displays the game over message (Win or Lose).
+         */
+        function gameOver(isWin) {
+            isGameOver = true;
+            clearInterval(timerInterval);
+            
+            modalTitle.textContent = isWin ? 'Victory! 🌻' : 'Game Over! 🥀';
+            modalMessage.textContent = isWin 
+                ? `You cleared the garden in ${elapsedTime} seconds! Excellent work, Gardener.`
+                : `Oh no! You stumbled upon a dangerous vine and got entangled. Try again!`;
+
+            // Reveal all vines on loss
+            if (!isWin) {
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        const cell = gameData[r][c];
+                        const cellEl = document.getElementById(getId(r, c));
+                        if (cell.isVine && !cell.isRevealed) {
+                            cellEl.classList.add('vine');
+                            cellEl.innerHTML = '🌱';
+                        }
+                        if (!cell.isVine && cell.isFlagged) {
+                            cellEl.classList.add('safe-miss');
+                            cellEl.innerHTML = '❌'; // Misplaced flag
+                        }
+                    }
+                }
+            }
+            
+            setTimeout(() => {
+                 messageModal.style.display = 'flex';
+            }, 500);
+        }
+
+        /**
+         * Sets up all necessary event listeners for the board and controls.
+         */
+        function setupListeners() {
+            // Cleanup previous listeners
+            board.removeEventListener('click', handleCellInteraction);
+            board.removeEventListener('contextmenu', handleContextMenu);
+            newGameButton.removeEventListener('click', startGame);
+            toggleFlagModeButton.removeEventListener('click', toggleFlagMode);
+
+            // Add new listeners
+            // CRITICAL FIX: Only use the 'click' listener to prevent double-firing on mobile taps.
+            board.addEventListener('click', handleCellInteraction); 
+            board.addEventListener('contextmenu', handleContextMenu); 
+
+            newGameButton.addEventListener('click', startGame);
+            toggleFlagModeButton.addEventListener('click', toggleFlagMode);
+        }
+
+        // Start the game when the script loads
+        window.onload = startGame;
+    </script>
+</body>
+</html>
+
